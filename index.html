@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>找出指定数字</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+      background: linear-gradient(135deg, #f9f5e6, #e3f2fd);
+      text-align: center;
+      padding: 16px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      color: #2c3e50;
+      margin: 12px 0;
+      font-weight: 600;
+    }
+
+    #stats {
+      position: sticky;
+      top: 0;
+      background-color: white;
+      padding: 10px;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 400px;
+      z-index: 10;
+      font-size: 1.1rem;
+      font-weight: bold;
+      color: #2c3e50;
+    }
+
+    #target {
+      font-size: 1.4rem;
+      margin: 16px 0;
+      color: #d32f2f;
+      font-weight: bold;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+      width: 100%;
+      max-width: 400px;
+      margin: 10px auto;
+    }
+
+    .cell {
+      aspect-ratio: 1;
+      border-radius: 14px;
+      background-color: #ffffff;
+      border: 1px solid #ddd;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+    }
+
+    .cell.selected {
+      background-color: #bbdefb;
+      transform: scale(1.03);
+    }
+
+    .controls {
+      margin: 20px 0;
+      width: 100%;
+      max-width: 400px;
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    button {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 12px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      cursor: pointer;
+      flex: 1;
+      max-width: 160px;
+      transition: background-color 0.2s;
+    }
+
+    .btn-home {
+      background-color: #FFA500;
+      color: white;
+    }
+
+    .btn-home:active {
+      background-color: #e69500;
+    }
+
+    .btn-next {
+      background-color: #2196F3;
+      color: white;
+    }
+
+    .btn-next:disabled {
+      background-color: #bbbbbb;
+      cursor: not-allowed;
+    }
+
+    .message {
+      margin-top: 12px;
+      font-size: 1.2rem;
+      min-height: 1.4rem;
+      color: #2c3e50;
+      font-weight: 500;
+      padding: 0 10px;
+      width: 100%;
+      max-width: 400px;
+    }
+  </style>
+</head>
+<body>
+  <h1>找出指定数字</h1>
+
+  <div id="stats">✅ <span id="correct">0</span> &nbsp; ❌ <span id="incorrect">0</span></div>
+
+  <div id="target">请找出数字：<span id="targetNumber"></span></div>
+
+  <div class="grid" id="numberGrid"></div>
+
+  <div class="controls">
+    <button class="btn-home" onclick="resetGame()">重置</button>
+    <button class="btn-next" id="nextBtn" onclick="submitAndNext()">下一题</button>
+  </div>
+
+  <div class="message" id="message"></div>
+
+  <script>
+    const allNumbers = Array.from({ length: 20 }, (_, i) => i + 1);
+    let targetNumber = 0;
+    let shuffledNumbers = [];
+    let selectedCell = null;
+    let correct = 0;
+    let incorrect = 0;
+    let isProcessing = false;
+    let voiceAndSoundEnabled = false;
+
+    // 语音播报：回答正确
+    function speakCorrect() {
+      if (!voiceAndSoundEnabled || !('speechSynthesis' in window)) return;
+      speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance('回答正确');
+      utterance.lang = 'zh-CN';
+      utterance.rate = 1.0;
+      speechSynthesis.speak(utterance);
+    }
+
+    // 语音播报：回答错误
+    function speakIncorrect() {
+      if (!voiceAndSoundEnabled || !('speechSynthesis' in window)) return;
+      speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance('回答错误');
+      utterance.lang = 'zh-CN';
+      utterance.rate = 1.0;
+      speechSynthesis.speak(utterance);
+    }
+
+    function shuffle(array) {
+      return [...array].sort(() => Math.random() - 0.5);
+    }
+
+    function updateStats() {
+      document.getElementById('correct').textContent = correct;
+      document.getElementById('incorrect').textContent = incorrect;
+    }
+
+    function startRound() {
+      targetNumber = allNumbers[Math.floor(Math.random() * 20)];
+      shuffledNumbers = shuffle(allNumbers);
+      selectedCell = null;
+      document.getElementById('targetNumber').textContent = targetNumber;
+      document.getElementById('message').textContent = '';
+      renderGrid();
+      isProcessing = false;
+      document.getElementById('nextBtn').disabled = false;
+
+      // 后续题目自动播报目标数字（如果已启用）
+      if (voiceAndSoundEnabled && 'speechSynthesis' in window) {
+        speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(`请找出数字 ${targetNumber}`);
+        utterance.lang = 'zh-CN';
+        utterance.rate = 1.0;
+        speechSynthesis.speak(utterance);
+      }
+    }
+
+    function renderGrid() {
+      const grid = document.getElementById('numberGrid');
+      grid.innerHTML = '';
+      shuffledNumbers.forEach(num => {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.textContent = num;
+        cell.onclick = function() {
+          // 首次点击：启用语音系统
+          if (!voiceAndSoundEnabled) {
+            voiceAndSoundEnabled = true;
+            if ('speechSynthesis' in window) {
+              speechSynthesis.cancel();
+              const utterance = new SpeechSynthesisUtterance(`请找出数字 ${targetNumber}`);
+              utterance.lang = 'zh-CN';
+              utterance.rate = 1.0;
+              speechSynthesis.speak(utterance);
+            }
+          }
+          selectCell(this);
+        };
+        grid.appendChild(cell);
+      });
+    }
+
+    function selectCell(cell) {
+      if (isProcessing || selectedCell === cell) return;
+      if (selectedCell) selectedCell.classList.remove('selected');
+      cell.classList.add('selected');
+      selectedCell = cell;
+    }
+
+    function submitAndNext() {
+      // 点“下一题”也尝试启用语音（防跳过点击）
+      if (!voiceAndSoundEnabled) {
+        voiceAndSoundEnabled = true;
+        if ('speechSynthesis' in window) {
+          speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(`请找出数字 ${targetNumber}`);
+          utterance.lang = 'zh-CN';
+          utterance.rate = 1.0;
+          speechSynthesis.speak(utterance);
+        }
+      }
+
+      if (isProcessing) return;
+      if (!selectedCell) {
+        showMessage("⚠️ 请先选择一个数字！");
+        return;
+      }
+
+      isProcessing = true;
+      document.getElementById('nextBtn').disabled = true;
+
+      const selectedNumber = parseInt(selectedCell.textContent);
+      if (selectedNumber === targetNumber) {
+        correct++;
+        showMessage(`✅ 正确！目标是 ${targetNumber}。`);
+        speakCorrect(); // 👈 播报“回答正确”
+      } else {
+        incorrect++;
+        showMessage(`❌ 错了！正确答案是 ${targetNumber}。`);
+        speakIncorrect(); // 👈 播报“回答错误”
+      }
+
+      updateStats();
+      setTimeout(startRound, 2000);
+    }
+
+    function showMessage(text) {
+      document.getElementById('message').textContent = text;
+    }
+
+    function resetGame() {
+      correct = 0;
+      incorrect = 0;
+      updateStats();
+      startRound();
+    }
+
+    // 初始化
+    window.onload = () => {
+      updateStats();
+      startRound();
+    };
+  </script>
+</body>
+</html>
