@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Web build and test output
+dist/
+dist-single/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Android local and generated files
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/capacitor-cordova-android-plugins/
+android/app/src/main/assets/public/
+*.jks
+*.keystore
+
+# Generated release binaries
+releases/

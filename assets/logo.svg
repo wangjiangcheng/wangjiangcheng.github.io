@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" fill="#0e203b"/>
+  <rect x="166" y="166" width="692" height="692" rx="150" fill="#0b66d3" stroke="#5b9ce8" stroke-width="22"/>
+  <path d="M248 682L322 608L396 682" fill="none" stroke="#ef5350" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M628 342L702 416L776 342" fill="none" stroke="#24b39b" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="512" y="650" fill="#ffffff" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="410" font-weight="800" text-anchor="middle">钱</text>
+</svg>
