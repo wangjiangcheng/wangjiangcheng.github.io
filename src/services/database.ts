@@ -2,8 +2,9 @@ import Dexie, { type EntityTable } from 'dexie';
 import Decimal from 'decimal.js';
 import type { DiaryEntry, SaveDiaryEntryInput } from '../types/diary';
 import type { IndicatorSnapshot, PriceBar, PurchaseRecord, Quote, WatchlistItem } from '../types/market';
-import { DEFAULT_SETTINGS, type AppSettings } from '../types/settings';
+import { DEFAULT_SETTINGS, normalizeSettings, type AppSettings } from '../types/settings';
 import { calculateYield } from './indicatorCalculator';
+import { resetHistoryLastAttempt } from './historyRefreshSchedule';
 
 class MarketDatabase extends Dexie {
   watchlist!: EntityTable<WatchlistItem, 'securityKey'>;
@@ -86,11 +87,11 @@ export async function initializeDatabase(): Promise<void> {
 }
 
 export async function getSettings(): Promise<AppSettings> {
-  return (await db.settings.get('main')) ?? DEFAULT_SETTINGS;
+  return normalizeSettings(await db.settings.get('main'));
 }
 
 export async function saveSettings(settings: AppSettings): Promise<void> {
-  await db.settings.put({ ...settings, hasUnbackedChanges: true });
+  await db.settings.put({ ...normalizeSettings(settings), hasUnbackedChanges: true });
 }
 
 export async function listWatchlist(): Promise<WatchlistItem[]> {
@@ -235,6 +236,11 @@ export async function getBars(securityKey: string): Promise<PriceBar[]> {
   return db.priceBars.where('securityKey').equals(securityKey).sortBy('date');
 }
 
+export async function getQuotes(securityKeys: string[]): Promise<Quote[]> {
+  const quotes = await db.quotes.bulkGet(securityKeys);
+  return quotes.filter((quote): quote is Quote => quote != null);
+}
+
 export async function saveMarketSnapshot(
   quotes: Quote[],
   bars: PriceBar[],
@@ -251,4 +257,5 @@ export async function clearMarketCache(): Promise<void> {
   await db.transaction('rw', db.quotes, db.priceBars, db.indicatorSnapshots, async () => {
     await Promise.all([db.quotes.clear(), db.priceBars.clear(), db.indicatorSnapshots.clear()]);
   });
+  resetHistoryLastAttempt();
 }

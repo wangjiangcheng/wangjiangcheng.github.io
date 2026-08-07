@@ -7,6 +7,7 @@ import { sha256 } from 'js-sha256';
 import type { DiaryEntry } from '../types/diary';
 import type { PurchaseRecord, WatchlistItem } from '../types/market';
 import type { AppSettings } from '../types/settings';
+import { normalizeSettings } from '../types/settings';
 import { db, getSettings, listWatchlist } from './database';
 
 export interface BackupFile {
@@ -253,6 +254,6 @@ export async function importBackup(backup: BackupFile, mode: 'merge' | 'replace'
       if (purchaseRecords.length) await db.purchaseRecords.bulkPut(purchaseRecords);
       if (diaryEntries.length) await db.diaryEntries.bulkPut(diaryEntries);
     }
-    await db.settings.put({ ...backup.settings, id: 'main', hasUnbackedChanges: true });
+    await db.settings.put({ ...normalizeSettings(backup.settings), id: 'main', hasUnbackedChanges: true });
   });
 }

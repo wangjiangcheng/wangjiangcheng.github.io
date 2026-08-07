@@ -1,6 +1,7 @@
 export interface AppSettings {
   id: 'main';
   refreshIntervalSeconds: number;
+  historyRefreshIntervalMinutes: number;
   staleAfterSeconds: number;
   expiredAfterSeconds: number;
   pollingEnabled: boolean;
@@ -17,6 +18,7 @@ export interface AppSettings {
 export const DEFAULT_SETTINGS: AppSettings = {
   id: 'main',
   refreshIntervalSeconds: 15,
+  historyRefreshIntervalMinutes: 1440,
   staleAfterSeconds: 45,
   expiredAfterSeconds: 300,
   pollingEnabled: true,
@@ -29,3 +31,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   lastExportedAt: null,
   hasUnbackedChanges: false,
 };
+
+export function normalizeSettings(settings?: Partial<AppSettings> | null): AppSettings {
+  return {
+    ...DEFAULT_SETTINGS,
+    ...settings,
+    hiddenColumns: settings?.hiddenColumns ?? DEFAULT_SETTINGS.hiddenColumns,
+  };
+}

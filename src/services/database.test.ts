@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   addPurchaseRecord,
+  clearMarketCache,
   db,
   deletePurchaseRecord,
   initializeDatabase,
+  getSettings,
   listDiaryEntries,
   listPurchaseRecords,
   listWatchlist,
@@ -11,9 +13,11 @@ import {
   saveWatchlistOrder,
   softDeleteWatchlistItem,
 } from './database';
+import { DEFAULT_SETTINGS } from '../types/settings';
 
 describe('watchlist repository', () => {
   afterEach(async () => {
+    localStorage.clear();
     await db.delete();
     await db.open();
   });
@@ -30,6 +34,23 @@ describe('watchlist repository', () => {
     await initializeDatabase();
     await softDeleteWatchlistItem('HKEX:00001');
     expect(await listWatchlist()).toEqual([]);
+  });
+
+  it('fills the independent history refresh interval for legacy settings', async () => {
+    await initializeDatabase();
+    const legacySettings = { ...DEFAULT_SETTINGS } as Partial<typeof DEFAULT_SETTINGS>;
+    delete legacySettings.historyRefreshIntervalMinutes;
+    await db.settings.put(legacySettings as typeof DEFAULT_SETTINGS);
+
+    expect((await getSettings()).historyRefreshIntervalMinutes).toBe(1440);
+  });
+
+  it('makes the independent history refresh due after clearing market cache', async () => {
+    localStorage.setItem('money-from-everywhere-history-last-attempt', String(Date.now()));
+
+    await clearMarketCache();
+
+    expect(localStorage.getItem('money-from-everywhere-history-last-attempt')).toBeNull();
   });
 
   it('does not recreate the seed after a deliberately empty list', async () => {

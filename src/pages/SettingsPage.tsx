@@ -64,6 +64,7 @@ export function SettingsPage({ settings, watchlistCount, reload }: SettingsPageP
     event.preventDefault();
     setError(null);
     if (!Number.isInteger(form.refreshIntervalSeconds) || form.refreshIntervalSeconds < 15 || form.refreshIntervalSeconds > 3600) return setError('刷新间隔应为 15 至 3600 秒的整数');
+    if (!Number.isInteger(form.historyRefreshIntervalMinutes) || form.historyRefreshIntervalMinutes < 5 || form.historyRefreshIntervalMinutes > 10080) return setError('历史 K 线刷新间隔应为 5 至 10080 分钟的整数');
     if (form.staleAfterSeconds >= form.expiredAfterSeconds) return setError('延迟阈值必须小于过期阈值');
     if (form.bollingerPeriods < 2 || form.bollingerPeriods > 120) return setError('布林带周期应为 2 至 120');
     if (form.bollingerMultiplier <= 0 || form.bollingerMultiplier > 10) return setError('标准差倍数应大于 0 且不超过 10');
@@ -146,9 +147,10 @@ export function SettingsPage({ settings, watchlistCount, reload }: SettingsPageP
 
       <form id="settings-form" className="settings-form" onSubmit={handleSave}>
         <section className="settings-section">
-          <header><div className="settings-section__icon"><RefreshCcw size={20} /></div><div><h2>行情刷新</h2><p>东方财富公开接口 · 最小刷新间隔 15 秒</p></div></header>
+          <header><div className="settings-section__icon"><RefreshCcw size={20} /></div><div><h2>行情刷新</h2><p>最新报价与历史 K 线使用独立刷新周期</p></div></header>
           <div className="settings-grid">
-            <label className="field"><span>刷新间隔（秒）</span><input type="number" min="15" max="3600" step="1" value={form.refreshIntervalSeconds} onChange={(event) => update('refreshIntervalSeconds', Number(event.target.value))} /></label>
+            <label className="field"><span>最新报价间隔（秒）</span><input type="number" min="15" max="3600" step="1" value={form.refreshIntervalSeconds} onChange={(event) => update('refreshIntervalSeconds', Number(event.target.value))} /></label>
+            <label className="field"><span>历史 K 线间隔（分钟）</span><input type="number" min="5" max="10080" step="1" value={form.historyRefreshIntervalMinutes} onChange={(event) => update('historyRefreshIntervalMinutes', Number(event.target.value))} /></label>
             <label className="field"><span>延迟阈值（秒）</span><input type="number" min="1" step="1" value={form.staleAfterSeconds} onChange={(event) => update('staleAfterSeconds', Number(event.target.value))} /></label>
             <label className="field"><span>过期阈值（秒）</span><input type="number" min="2" step="1" value={form.expiredAfterSeconds} onChange={(event) => update('expiredAfterSeconds', Number(event.target.value))} /></label>
             <label className="field"><span>失败重试次数</span><input type="number" min="0" max="5" step="1" value={form.retryCount} onChange={(event) => update('retryCount', Number(event.target.value))} /></label>

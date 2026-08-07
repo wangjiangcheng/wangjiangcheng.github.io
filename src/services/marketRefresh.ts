@@ -3,11 +3,16 @@ import type { IndicatorSnapshot, PriceBar, Quote, WatchlistItem } from '../types
 import type { AppSettings } from '../types/settings';
 import { calculateIndicatorSnapshot } from './indicatorCalculator';
 import { eastmoneyProvider } from './eastmoneyProvider';
-import { getBars, saveMarketSnapshot } from './database';
+import { getBars, getQuotes, saveMarketSnapshot } from './database';
 
 export interface RefreshResult {
   quotes: Quote[];
   indicators: IndicatorSnapshot[];
+  durationMs: number;
+  errors: Record<string, string>;
+}
+
+export interface HistoryRefreshResult {
   durationMs: number;
   errors: Record<string, string>;
 }
@@ -60,13 +65,13 @@ async function withRetry<T>(task: () => Promise<T>, retryCount: number): Promise
       return await task();
     } catch (error) {
       lastError = error;
-      if (attempt < retryCount) await new Promise((resolve) => window.setTimeout(resolve, 350 * 2 ** attempt));
+      if (attempt < retryCount) await new Promise((resolve) => globalThis.setTimeout(resolve, 350 * 2 ** attempt));
     }
   }
   throw lastError;
 }
 
-export async function refreshMarketData(
+export async function refreshQuoteData(
   items: WatchlistItem[],
   settings: AppSettings,
   signal?: AbortSignal,
@@ -89,10 +94,9 @@ export async function refreshMarketData(
       return;
     }
     try {
-      let bars = await getBars(item.securityKey);
-      if (bars.length < 120) {
-        bars = await withRetry(() => eastmoneyProvider.getDailyBars(item, signal), settings.retryCount);
-      }
+      const bars = await getBars(item.securityKey);
+      if (bars.length < 120) errors[item.securityKey] = '历史 K 线缓存不足，等待独立刷新';
+      if (bars.length === 0) return;
       const liveBars = applyLivePrice(bars, item, quote);
       barsToSave.push(...liveBars.slice(-500));
       indicators.push(calculateIndicatorSnapshot(
@@ -109,4 +113,58 @@ export async function refreshMarketData(
 
   await saveMarketSnapshot(quotes, barsToSave, indicators);
   return { quotes, indicators, errors, durationMs: Math.round(performance.now() - startedAt) };
+}
+
+async function forEachWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  task: (item: T) => Promise<void>,
+): Promise<void> {
+  let nextIndex = 0;
+  const worker = async () => {
+    while (nextIndex < items.length) {
+      const item = items[nextIndex];
+      nextIndex += 1;
+      await task(item);
+    }
+  };
+  const workerCount = Math.min(concurrency, items.length);
+  await Promise.all(Array.from({ length: workerCount }, worker));
+}
+
+export async function refreshHistoryData(
+  items: WatchlistItem[],
+  settings: AppSettings,
+  signal?: AbortSignal,
+): Promise<HistoryRefreshResult> {
+  const startedAt = performance.now();
+  const enabledItems = items.filter((item) => item.enabled);
+  const cachedQuotes = await getQuotes(enabledItems.map((item) => item.securityKey));
+  const quoteMap = new Map(cachedQuotes.map((quote) => [quote.securityKey, quote]));
+  const errors: Record<string, string> = {};
+  const barsToSave: PriceBar[] = [];
+  const indicators: IndicatorSnapshot[] = [];
+
+  await forEachWithConcurrency(enabledItems, 2, async (item) => {
+    try {
+      const historyBars = await eastmoneyProvider.getDailyBars(item, signal);
+      if (historyBars.length === 0) throw new Error(`${item.symbol} 的历史行情为空`);
+      const quote = quoteMap.get(item.securityKey);
+      const bars = quote ? applyLivePrice(historyBars, item, quote) : historyBars;
+      const currentPrice = quote?.currentPrice ?? bars.at(-1)!.close;
+      barsToSave.push(...bars.slice(-500));
+      indicators.push(calculateIndicatorSnapshot(
+        item.securityKey,
+        bars,
+        currentPrice,
+        settings.bollingerPeriods,
+        settings.bollingerMultiplier,
+      ));
+    } catch (error) {
+      errors[item.securityKey] = error instanceof Error ? error.message : '历史 K 线更新失败';
+    }
+  });
+
+  await saveMarketSnapshot([], barsToSave, indicators);
+  return { errors, durationMs: Math.round(performance.now() - startedAt) };
 }
